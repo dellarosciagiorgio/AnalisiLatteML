@@ -1,82 +1,193 @@
-﻿using System;
+﻿using ClosedXML.Excel;
+using Microsoft.ML;
+using Microsoft.ML.Data;
+using System;
 using System.Collections.Generic;
-using System.Data;
-using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
-using ClosedXML;
-using ClosedXML.Excel;
 
 namespace LatteMarcheML
 {
-    class Program
+    public class Previsioni
     {
-        public const string xlsfilepath = @"C:\Users\Giorgio Della Roscia\Desktop\ML\Progetti\Database\Analisi latte.xlsx";
+        [ColumnName("VALORE")]
+        public double Grassi { get; set; }
+        public double Proteine { get; set; }
+    }
+
+    public class Program
+    {
+        public const string percorsoFileExcel = @"C:\Users\Giorgio Della Roscia\Desktop\ML\Progetti\Database\Analisi latte.xlsx";
         static void Main(string[] args)
         {
-            var workbook = new XLWorkbook(xlsfilepath);
-            var sheet1 = workbook.Worksheet("Analisi");
-            var sheet2 = workbook.Worksheet("Valori");
-            var listaAnalisiLatte = GetSheet1Data(sheet1);
-            var listaValoriPrelievi = GetSheet2Data(sheet2);
-            List<ValorePrelievo> valori = listaValoriPrelievi;
-            AssociaDati(valori, listaAnalisiLatte);
+            Console.SetWindowSize(150, 50);
+            var fileExcel = new XLWorkbook(percorsoFileExcel);
+            var foglioExcelAnalisi = fileExcel.Worksheet("Analisi");
+            var listaAnalisiLatte = PrendiDatiFoglioAnalisi(foglioExcelAnalisi);
+            var datiProduttori = PrendiDati(listaAnalisiLatte);
+            var datiProduttore = PrendiDatiSingoloProduttore(datiProduttori);
+            PrevisioniML(datiProduttore);
+            Console.ReadLine();
         }
 
-        private static List<AnalisiLatte> GetSheet1Data(IXLWorksheet sheet1)
+        private static List<AnalisiLatteExcel> PrendiDatiFoglioAnalisi(IXLWorksheet foglioExcelAnalisi)
         {
-            var table1 = sheet1.Tables.First();
-            var list1 = table1.DataRange.Rows().Select(r => new AnalisiLatte()
+            var tabellaAnalisi = foglioExcelAnalisi.Tables.First();
+            var listaAnalisiLatte = tabellaAnalisi.DataRange.Rows().Select(riga => new AnalisiLatteExcel()
             {
-                Campione = r.Field("CAMPIONE").GetString().Trim(),
-                CodiceProduttore = r.Field("CODICE_PRODUTTORE").GetString().Trim(),
-                NomeProduttore = r.Field("NOME_PRODUTTORE").GetString().Trim(),
-                IdProduttore = r.Field("ID_PRODUTTORE").GetString().Trim(),
-                IdAllevamento = r.Field("ID_ALLEVAMENTO").GetString().Trim(),
-                CodiceAsl = r.Field("CODICE_ASL").GetString().Trim(),
-                TipoLatte = r.Field("TIPO_LATTE").GetString().Trim(),
-                IdTipoLatte = r.Field("ID_TIPO_LATTE").GetString().Trim(),
-                DataRapportoDiProva = r.Field("DATA_RAPPORTO_DI_PROVA").DataType == XLDataType.DateTime ? r.Field("DATA_RAPPORTO_DI_PROVA").GetDateTime() : (DateTime?)null,
-                DataAccettazione = r.Field("DATA_ACCETTAZIONE").DataType == XLDataType.DateTime ? r.Field("DATA_ACCETTAZIONE").GetDateTime() : (DateTime?)null,
-                DataPrelievo = r.Field("DATA_PRELIEVO").DataType == XLDataType.DateTime ? r.Field("DATA_PRELIEVO").GetDateTime() : (DateTime?)null
+                Campione = riga.Field("CAMPIONE").GetString().Trim(),
+                CodiceProduttore = riga.Field("CODICE_PRODUTTORE").GetString().Trim(),
+                NomeProduttore = riga.Field("NOME_PRODUTTORE").GetString().Trim(),
+                IdProduttore = riga.Field("ID_PRODUTTORE").GetString().Trim(),
+                IdAllevamento = riga.Field("ID_ALLEVAMENTO").GetString().Trim(),
+                CodiceAsl = riga.Field("CODICE_ASL").GetString().Trim(),
+                TipoLatte = riga.Field("TIPO_LATTE").GetString().Trim(),
+                IdTipoLatte = riga.Field("ID_TIPO_LATTE").GetString().Trim(),
+                DataRapportoDiProva = riga.Field("DATA_RAPPORTO_DI_PROVA").DataType == XLDataType.DateTime ? riga.Field("DATA_RAPPORTO_DI_PROVA").GetDateTime().Date : (DateTime?)null,
+                DataAccettazione = riga.Field("DATA_ACCETTAZIONE").DataType == XLDataType.DateTime ? riga.Field("DATA_ACCETTAZIONE").GetDateTime().Date : (DateTime?)null,
+                DataPrelievo = riga.Field("DATA_PRELIEVO").DataType == XLDataType.DateTime ? riga.Field("DATA_PRELIEVO").GetDateTime().Date : (DateTime?)null
             }).ToList();
-            return list1;
+            return listaAnalisiLatte;
         }
 
-        private static List<ValorePrelievo> GetSheet2Data(IXLWorksheet sheet2)
+        private static List<ValorePrelievo> PrendiDatiFoglioValori(IXLWorksheet foglioExcelValori)
         {
-            var table2 = sheet2.Tables.First();
-            var list2 = table2.DataRange.Rows().Select(r => new ValorePrelievo()
+            var tabellaValori = foglioExcelValori.Tables.First();
+            var listaValoriPrelievi = tabellaValori.DataRange.Rows().Select(riga => new ValorePrelievo()
             {
-                Id = r.Field("ID").GetString().Trim(),
-                Nome = r.Field("NOME").GetString().Trim(),
-                Uom = r.Field("UOM").GetString().Trim(),
-                Valore = r.Field("VALORE").IsEmpty() ? (Double?)null :
-                         (r.Field("VALORE").DataType == XLDataType.Text) ? ((String.Compare(r.Field("VALORE").GetString().Trim(), "assenti") == 0) ? (Double?)null :
-                         Double.Parse(r.Field("VALORE").GetString().Trim())) :
-                         ((r.Field("VALORE").DataType == XLDataType.Number) ? r.Field("VALORE").GetDouble() :
+                Id = riga.Field("ID").GetString().Trim(),
+                Nome = riga.Field("NOME").GetString().Trim(),
+                Uom = riga.Field("UOM").GetString().Trim(),
+                Valore = riga.Field("VALORE").IsEmpty() ? (Double?)null :
+                         (riga.Field("VALORE").DataType == XLDataType.Text) ? ((String.Compare(riga.Field("VALORE").GetString().Trim(), "assenti") == 0) ? (Double?)null :
+                         Double.Parse(riga.Field("VALORE").GetString().Trim())) :
+                         ((riga.Field("VALORE").DataType == XLDataType.Number) ? riga.Field("VALORE").GetDouble() :
                          (Double?)null),
-                FuoriSoglia = r.Field("VALORE").IsEmpty() ? (Boolean?)null :
-                         (r.Field("VALORE").DataType == XLDataType.Text) ? ((String.Compare(r.Field("VALORE").GetString().Trim(), "assenti") == 0) ? (Boolean?)null :
-                         Convert.ToBoolean(r.Field("FUORI_SOGLIA").GetValue<Int32>())) :
-                         ((r.Field("VALORE").DataType == XLDataType.Number) ? Convert.ToBoolean(r.Field("FUORI_SOGLIA").GetValue<Int32>()) :
+                FuoriSoglia = riga.Field("VALORE").IsEmpty() ? (Boolean?)null :
+                         (riga.Field("VALORE").DataType == XLDataType.Text) ? ((String.Compare(riga.Field("VALORE").GetString().Trim(), "assenti") == 0) ? (Boolean?)null :
+                         Convert.ToBoolean(riga.Field("FUORI_SOGLIA").GetValue<Int32>())) :
+                         ((riga.Field("VALORE").DataType == XLDataType.Number) ? Convert.ToBoolean(riga.Field("FUORI_SOGLIA").GetValue<Int32>()) :
                          (Boolean?)null),
-                AnalisiId = r.Field("Analisi_Id").GetString().Trim()
+                AnalisiId = riga.Field("Analisi_Id").GetString().Trim(),
             }).ToList();
-            return list2;
+            return listaValoriPrelievi;
         }
 
-        static void AssociaDati(List<ValorePrelievo> valori, List<AnalisiLatte> listaAnalisiLatte)
+        private static List<Produttore> PrendiDati(List<AnalisiLatteExcel> listaAnalisiLatte)
         {
-            foreach (var rowValore in valori)
+            var FileExcel = new XLWorkbook(percorsoFileExcel);
+            var foglioExcelValori = FileExcel.Worksheet("Valori");
+            var listaValoriPrelievi = PrendiDatiFoglioValori(foglioExcelValori);
+            foreach (var riga in listaValoriPrelievi)
             {
-                var index = listaAnalisiLatte.FindIndex(a => a.Campione == rowValore.AnalisiId);
-                listaAnalisiLatte[index].Valori.Add(rowValore);
-                Console.WriteLine($"{listaAnalisiLatte[index].Valori.LastOrDefault().Nome}: {listaAnalisiLatte[index].Valori.LastOrDefault().Valore}");
+                var indice = listaAnalisiLatte.FindIndex(analisi => analisi.Campione == riga.AnalisiId);
+                listaAnalisiLatte[indice].Valori.Add(riga);
             }
-            //Valori.Add(new ValorePrelievo() { list2[i].Id, list2[i].Nome, list2[i].Uom, list2[i].Valore, list2[i].FuoriSoglia, list2[i].AnalisiId });
-            //listaAnalisiLatte.Find(a => a.NomeProduttore == "S.A.M.").Valori.ForEach(v => Console.WriteLine($"{v.Nome}: {v.Valore}"));
-            return;
+            var datiProduttori = PrendiDatiSingoloProduttore(listaAnalisiLatte);
+            return datiProduttori;
+        }
+
+        private static List<Produttore> PrendiDatiSingoloProduttore(List<AnalisiLatteExcel> listaAnalisiLatte)
+        {
+            var datiProduttori = new List<Produttore>();
+            foreach (var rowAnalisi in listaAnalisiLatte)
+            {
+                if (!datiProduttori.Exists(p => p.Id == rowAnalisi.IdProduttore))
+                {
+                    datiProduttori.Add(new Produttore()
+                    {
+                        Nome = rowAnalisi.NomeProduttore,
+                        Codice = rowAnalisi.CodiceProduttore,
+                        Id = rowAnalisi.IdProduttore,
+                        IdAllevamento = rowAnalisi.IdAllevamento,
+                        TipoLatte = rowAnalisi.TipoLatte,
+                        IdTipoLatte = rowAnalisi.IdTipoLatte
+                    });
+                }
+
+                datiProduttori[datiProduttori.FindIndex(i => i.Id == rowAnalisi.IdProduttore)].Analisi.Add(new AnalisiLatte()
+                {
+                    Campione = rowAnalisi.Campione,
+                    DataRapportoDiProva = rowAnalisi.DataRapportoDiProva,
+                    DataAccettazione = rowAnalisi.DataAccettazione,
+                    DataPrelievo = rowAnalisi.DataPrelievo,
+                    Valori = rowAnalisi.Valori
+                });
+            }
+            return datiProduttori;
+        }
+
+        private static Produttore PrendiDatiSingoloProduttore(List<Produttore> datiProduttori)
+        {
+            Console.Write("Inserire l'ID del produttore per visualizzarne i dati dei prelievi: ");
+            var idProduttore = Console.ReadLine();
+            Console.Clear();
+            Produttore app = null;
+            foreach (var datiProduttore in datiProduttori)
+            {
+                if (idProduttore == datiProduttore.Id)
+                {
+                    Console.WriteLine($"{datiProduttore.Nome}, ID: {datiProduttore.Id}, codice: {datiProduttore.Codice}, ID allevamento: {datiProduttore.IdAllevamento}, tipo latte: {datiProduttore.TipoLatte}, ID tipo latte: {datiProduttore.IdTipoLatte}.\n");
+                    int indiceAnalisi, indiceValori;
+                    datiProduttore.Analisi.ForEach(analisi =>
+                    {
+                        indiceAnalisi = datiProduttore.Analisi.IndexOf(analisi);
+                        Console.WriteLine($"\n\nCampione: {analisi.Campione}, data rapporto di prova: {analisi.DataRapportoDiProva.Value:dd/MM/yyyy}, data accettazione: {analisi.DataAccettazione.Value:dd/MM/yyyy}, data prelievo: {analisi.DataPrelievo.Value:dd/MM/yyyy}\n");
+                        datiProduttore.Analisi[indiceAnalisi].Valori.ForEach(valori =>
+                        {
+                            string fuorisoglia = "no";
+                            indiceValori = datiProduttore.Analisi[indiceAnalisi].Valori.IndexOf(valori);
+                            if (datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].FuoriSoglia == true)
+                            {
+                                fuorisoglia = "sì";
+                            }
+                            Console.WriteLine($"Analisi ID: {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Id}, ID: {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Id}, {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Nome}: {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Valore} {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Uom}, fuori soglia: {fuorisoglia}.");
+                        });
+                    });
+                    app = datiProduttore;
+                }
+            }
+            Console.ReadLine();
+            return app;
+        }
+
+        private static void PrevisioniML(Produttore datiProduttore)
+        {
+            MLContext mlContext = new MLContext();
+
+            // 1. Import or create training data
+            Produttore[] datiPrevisioneLatte =
+            {
+                new Produttore() { Codice = datiProduttore.Codice },
+                new Produttore() { Nome = datiProduttore.Nome },
+                new Produttore() { Id = datiProduttore.Id },
+                new Produttore() { IdAllevamento = datiProduttore.IdAllevamento },
+                new Produttore() { TipoLatte = datiProduttore.TipoLatte },
+                new Produttore() { IdTipoLatte = datiProduttore.IdTipoLatte },
+                new Produttore() { Analisi = datiProduttore.Analisi }
+            };
+            var datiDiTraining = mlContext.Data.LoadFromEnumerable(datiPrevisioneLatte);
+
+            // 2. Specify data preparation and model training pipeline
+            var pipeline = mlContext.Transforms.Concatenate("Features", new[] { "data prelievo" })
+                .Append(mlContext.Regression.Trainers.Sdca(labelColumnName: "grassi", maximumNumberOfIterations: 100))
+                .Append(mlContext.Regression.Trainers.Sdca(labelColumnName: "proteine", maximumNumberOfIterations: 100));
+
+            // 3. Train model
+            var modelloDiTraning = pipeline.Fit(datiDiTraining);
+
+            // 4. Make a prediction: tempo/grassi
+            //var size = new HouseData() { Size = 2.5F };
+
+            foreach (var prelievo in datiPrevisioneLatte)
+            {
+
+            }
+            Produttore dataPrelievo = new Produttore() { /*datiProduttore.Analisi[0].DataPrelievo =*/ };
+            Previsioni grassi = mlContext.Model.CreatePredictionEngine<Produttore, Previsioni>(modelloDiTraning).Predict(dataPrelievo);
+            Previsioni proteine = mlContext.Model.CreatePredictionEngine<Produttore, Previsioni>(modelloDiTraning).Predict(dataPrelievo);
+            //Console.WriteLine($"Previsione valori grassi e proteine : {dataPrelievo.Analisi[0].DataPrelievo * 1000} {grassi.Grassi * 1000} sq ft= {proteine.Proteine * 100:C}k");
+
+            //var stima = grassi.Predict(dataPrelievo);
         }
     }
 }
