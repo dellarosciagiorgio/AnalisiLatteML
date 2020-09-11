@@ -100,7 +100,6 @@ namespace LatteMarcheML
 
         public static void TerminaEsecuzione()
         {
-            Console.ReadLine();
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine("\nPremi qualsiasi tasto per terminare l'esecuzione.");
             Console.ForegroundColor = ConsoleColor.White;

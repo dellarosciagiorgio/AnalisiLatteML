@@ -1,5 +1,6 @@
 ﻿using ClosedXML.Excel;
 using Microsoft.ML;
+using PLplot;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -227,7 +228,7 @@ namespace LatteMarcheML
         private static List<AnalisiMLPrevisioni> PrevisioniML(List<AnalisiML> analisiML)
         {
             const string percorsoCartella = @"C:\Users\Giorgio Della Roscia\source\repos\LatteMarcheML\Data";
-             var mlContext = new MLContext(seed: 0);
+            var mlContext = new MLContext(seed: 0);
             var datiDiTrain = mlContext.Data.LoadFromEnumerable<AnalisiML>(analisiML);
             List<AnalisiML> listaDatiDiTest = new List<AnalisiML>();
             for (int i = 0; i < 10; i++)
@@ -326,6 +327,31 @@ namespace LatteMarcheML
                 GestoreInterfaccia.StampaIntestazionePrevisione(modello.name);
                 ModelloML.CalcolaPrevisioni(mlContext, modello.name, algoritmoDiPrevisione, 10, listaDatiDiTest);
             }
+
+
+
+            var sales = mlContext.Data.CreateEnumerable<AnalisiML>(datiDiTest, reuseRowObject: false).ToArray();
+            var pl = new PLStream();
+            pl.sdev("pngcairo");                // png rendering
+            pl.sfnam($@"{percorsoCartella}\PrevisioniLatteMarcheML.png");               // output filename
+            pl.spal0("cmap0_alternate.pal");    // alternate color palette
+            pl.init();
+            pl.env(
+                0, 12,                          // x-axis range
+                0, 5,                         // y-axis range
+                AxesScale.Independent,          // scale x and y independently
+                AxisBox.BoxTicksLabelsAxes);    // draw box, ticks, and num ticks
+            pl.lab(
+                "Data prelievo",                         // x-axis label
+                "Grasso (per calcolo)",                        // y-axis label
+                "Previsioni latte");     // plot title
+            //var dataPrelievo = $"{sales select(double)x.Giorno}/{sales select(double)x.Mese}/{sales select(double)x.Anno}";
+            pl.line(
+                //(from x in Enumerable.Range(0, sales.Count()) select (double)x).ToArray(), //numero date non valore date
+                (from x in sales select (double)x.Mese).ToArray(), //numero date non valore date
+                (from y in sales select (double)y.GrassoPerCalcolo).ToArray()
+            ) ;
+            pl.eop();
             return null; //dati previsti da inserire nel csv con i reali
         }
 
