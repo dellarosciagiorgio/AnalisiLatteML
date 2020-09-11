@@ -13,7 +13,7 @@ namespace LatteMarcheML
         public const string percorsoFileExcel = @"C:\Users\Giorgio Della Roscia\source\repos\LatteMarcheML\Data\Analisi latte.xlsx";
         static void Main(string[] args)
         {
-            Console.SetWindowSize(150, 60);
+            Console.SetWindowSize(190, 70);
             var fileExcel = new XLWorkbook(percorsoFileExcel);
             var foglioExcelAnalisi = fileExcel.Worksheet("Analisi");
             var listaAnalisiLatte = PrendiDatiFoglioAnalisi(foglioExcelAnalisi);
@@ -27,8 +27,8 @@ namespace LatteMarcheML
 
         public static string PrendiPercorsoCompleto(string percorsoParziale)
         {
-            FileInfo _dataRoot = new FileInfo(typeof(Program).Assembly.Location);
-            string percorsoCartellaAssembly = _dataRoot.Directory.FullName;
+            FileInfo cartellaDati = new FileInfo(typeof(Program).Assembly.Location);
+            string percorsoCartellaAssembly = cartellaDati.Directory.FullName;
             string percorsoCompleto = Path.Combine(percorsoCartellaAssembly, percorsoParziale);
             return percorsoCompleto;
         }
@@ -147,70 +147,233 @@ namespace LatteMarcheML
                 {
                     listaDatiAnalisiML.Add(new AnalisiML()
                     {
+                        /*GrassoPerCalcolo = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore.ToString() == "" ? 0f : analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore,
+                        GrassoFuoriSoglia = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso").FuoriSoglia.ToString() == "" ? 0f : analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso").FuoriSoglia,
+                        Giorno = analisi.DataPrelievo == "" ? 0f : float.Parse(analisi.DataPrelievo.Substring(0, 2)),*/
                         Campione = analisi.Campione,
                         NomeProduttore = produttore.Nome,
-                        GrassoPv = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore.ToString() == "" ? 0f : analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore,
-                        GrassoPerCalcolo = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore.ToString() == "" ? 0f : analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore,
-                        GrassoPerCalcoloFuoriSoglia = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").FuoriSoglia.ToString() == "" ? 0f : analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").FuoriSoglia,
-                        Giorno = analisi.DataPrelievo == "" ? 0f : float.Parse(analisi.DataPrelievo.Substring(0, 2)),
-                        Mese = analisi.DataPrelievo == "" ? 0f : float.Parse(analisi.DataPrelievo.Substring(3, 2)),
-                        Anno = analisi.DataPrelievo == "" ? 0f : float.Parse(analisi.DataPrelievo.Substring(6, 4))
+                        IdProduttore = produttore.Id,
+                        Grasso = PrendiValore(analisi, "Grasso"),
+                        GrassoFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Grasso"),
+                        GrassoPerCalcolo = PrendiValore(analisi, "Grasso (per calcolo)"),
+                        GrassoPerCalcoloFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Grasso (per calcolo)"),
+                        Proteine = PrendiValore(analisi, "Proteine"),
+                        ProteineFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Proteine"),
+                        ProteinePerCalcolo = PrendiValore(analisi, "Proteine (per calcolo)"),
+                        ProteinePerCalcoloFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Proteine (per calcolo)"),
+                        Lattosio = PrendiValore(analisi, "Lattosio"),
+                        LattosioFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Lattosio"),
+                        ResiduoSeccoMagro = PrendiValore(analisi, "Residuo secco magro"),
+                        ResiduoSeccoMagroFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Residuo secco magro"),
+                        Ph = PrendiValore(analisi, "pH"),
+                        PhFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "pH"),
+                        IndiceCrioscopico = PrendiValore(analisi, "Indice Crioscopico"),
+                        IndiceCrioscopicoFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Indice Crioscopico"),
+                        ContenutoInAcquaAggiunta = PrendiValore(analisi, "Contenuto in acqua aggiunta"),
+                        ContenutoInAcquaAggiuntaFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Contenuto in acqua aggiunta"),
+                        CelluleSomatiche = PrendiValore(analisi, "Cellule somatiche"),
+                        CelluleSomaticheFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Cellule somatiche"),
+                        CaricaBattericaTotale = PrendiValore(analisi, "Carica Batterica Totale"),
+                        CaricaBattericaTotaleFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Carica Batterica Totale"),
+                        MediaCelluleTrimestrePrecendente = PrendiValore(analisi, "Media Cellule Trimestre Precendente"),
+                        MediaCelluleTrimestrePrecendenteFuoriSoglia = PrendiFlagFuoriSoglia(analisi, "Media Cellule Trimestre Precendente"),
+                        Giorno = PrendiData(analisi, 0, 2),
+                        Mese = PrendiData(analisi, 3, 2),
+                        Anno = PrendiData(analisi, 6, 4),
+                        GrassoPv = PrendiValore(analisi, "Grasso (per calcolo)"),
+                        ProteinePv = PrendiValore(analisi, "Proteine (per calcolo)")
                     });
                 }
             }
             return listaDatiAnalisiML;
         }
 
+        private static float PrendiValore(AnalisiLatte analisi, string datoInteressato)
+        {
+            if (analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == datoInteressato).Valore.ToString() != "")
+            {
+                if (analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == datoInteressato).Valore.ToString() != "assenti")
+                {
+                    float valore = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == datoInteressato).Valore;
+                    return valore;
+                }
+            }
+            return 0f;
+        }
+
+        private static float PrendiFlagFuoriSoglia(AnalisiLatte analisi, string datoInteressato)
+        {
+            if (analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == datoInteressato).FuoriSoglia.ToString() != "")
+            {
+                if (analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == datoInteressato).FuoriSoglia.ToString() != "assenti")
+                {
+                    var flagFuoriFoglia = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == datoInteressato).FuoriSoglia;
+                    return flagFuoriFoglia;
+                }
+            }
+            return 0f;
+        }
+
+        private static float PrendiData(AnalisiLatte analisi, int indiceInizio, int lunghezza)
+        {
+            if (analisi.DataPrelievo != "")
+            {
+                var dato = float.Parse(analisi.DataPrelievo.Substring(indiceInizio, lunghezza));
+                return dato;
+            }
+            return 0f;
+        }
+
         private static List<AnalisiMLPrevisioni> PrevisioniML(List<AnalisiML> analisiML)
         {
             const string percorsoCartella = @"C:\Users\Giorgio Della Roscia\source\repos\LatteMarcheML\Data";
-            //string percorsoFileDiTraining = $@"{percorsoCartella}\DatiProduttori - train.csv";
-            //string percorsoFileDiTest = $@"{percorsoCartella}\DatiProduttori - test.csv";
-            //string percorsoFileDiTrainingCompleto = PrendiPercorsoCompleto(percorsoFileDiTraining);
-            //string percorsoFileDiTestCompleto = PrendiPercorsoCompleto(percorsoFileDiTest);
-            var mlContext = new MLContext(seed: 0);
+             var mlContext = new MLContext(seed: 0);
             var datiDiTrain = mlContext.Data.LoadFromEnumerable<AnalisiML>(analisiML);
-            //var datiDiTest = mlContext.Data.LoadFromTextFile<AnalisiML>(percorsoFileDiTestCompleto, separatorChar: ',', hasHeader: true);
-            //var datiDiTest = mlContext.Data.LoadFromEnumerable<AnalisiML>(ModelloML.LeggiDatiDiTestDaCsv(10));
             List<AnalisiML> listaDatiDiTest = new List<AnalisiML>();
             for (int i = 0; i < 10; i++)
             {
-                //var singolaAnalisi = analisiML[i * 2]; 
-                //AnalisiML app = singolaAnalisi.Campione, //TODO: come si inseriscono i dati direttamentein un oggetto?
                 listaDatiDiTest.Add(analisiML[i*2]);
             }
-            var datiDiTest = mlContext.Data.LoadFromEnumerable<AnalisiML>(listaDatiDiTest);            
-            var dataProcessPipeline = mlContext.Transforms.Concatenate("Features", nameof(AnalisiML.GrassoPerCalcolo), nameof(AnalisiML.GrassoPerCalcoloFuoriSoglia), /*nameof(AnalisiML.ProteinePerCalcolo), nameof(AnalisiML.ProteinePerCalcoloFuoriSoglia),*/ nameof(AnalisiML.Giorno), nameof(AnalisiML.Mese), nameof(AnalisiML.Anno)).AppendCacheCheckpoint(mlContext);
-            (string name, IEstimator<ITransformer> value)[] modelliDiRegressione = {
+            var datiDiTest = mlContext.Data.LoadFromEnumerable<AnalisiML>(listaDatiDiTest);
+            var grassoPipeline = mlContext.Transforms.CopyColumns("Label", "GrassoPV").Append(mlContext.Transforms.Concatenate("Features",
+            #region
+                nameof(AnalisiML.Grasso),
+                nameof(AnalisiML.GrassoFuoriSoglia),
+                nameof(AnalisiML.GrassoPerCalcolo),
+                nameof(AnalisiML.GrassoPerCalcoloFuoriSoglia),
+                nameof(AnalisiML.Proteine),
+                nameof(AnalisiML.ProteineFuoriSoglia),
+                nameof(AnalisiML.ProteinePerCalcolo),
+                nameof(AnalisiML.ProteinePerCalcoloFuoriSoglia),
+                nameof(AnalisiML.Lattosio),
+                nameof(AnalisiML.LattosioFuoriSoglia),
+                nameof(AnalisiML.ResiduoSeccoMagro),
+                nameof(AnalisiML.ResiduoSeccoMagroFuoriSoglia),
+                nameof(AnalisiML.Ph),
+                nameof(AnalisiML.PhFuoriSoglia),
+                nameof(AnalisiML.IndiceCrioscopico),
+                nameof(AnalisiML.IndiceCrioscopicoFuoriSoglia),
+                nameof(AnalisiML.ContenutoInAcquaAggiunta),
+                nameof(AnalisiML.ContenutoInAcquaAggiuntaFuoriSoglia),
+                nameof(AnalisiML.CelluleSomatiche),
+                nameof(AnalisiML.CelluleSomaticheFuoriSoglia),
+                nameof(AnalisiML.CaricaBattericaTotale),
+                nameof(AnalisiML.CaricaBattericaTotaleFuoriSoglia),
+                nameof(AnalisiML.MediaCelluleTrimestrePrecendente),
+                nameof(AnalisiML.MediaCelluleTrimestrePrecendenteFuoriSoglia),
+                nameof(AnalisiML.Giorno),
+                nameof(AnalisiML.Mese),
+                nameof(AnalisiML.Anno)).AppendCacheCheckpoint(mlContext));
+            #endregion
+            var proteinePipeline = mlContext.Transforms.CopyColumns("Label", "ProteinePV").Append(mlContext.Transforms.Concatenate("Features",
+            #region
+                nameof(AnalisiML.Grasso),
+                nameof(AnalisiML.GrassoFuoriSoglia),
+                nameof(AnalisiML.GrassoPerCalcolo),
+                nameof(AnalisiML.GrassoPerCalcoloFuoriSoglia),
+                nameof(AnalisiML.Proteine),
+                nameof(AnalisiML.ProteineFuoriSoglia),
+                nameof(AnalisiML.ProteinePerCalcolo),
+                nameof(AnalisiML.ProteinePerCalcoloFuoriSoglia),
+                nameof(AnalisiML.Lattosio),
+                nameof(AnalisiML.LattosioFuoriSoglia),
+                nameof(AnalisiML.ResiduoSeccoMagro),
+                nameof(AnalisiML.ResiduoSeccoMagroFuoriSoglia),
+                nameof(AnalisiML.Ph),
+                nameof(AnalisiML.PhFuoriSoglia),
+                nameof(AnalisiML.IndiceCrioscopico),
+                nameof(AnalisiML.IndiceCrioscopicoFuoriSoglia),
+                nameof(AnalisiML.ContenutoInAcquaAggiunta),
+                nameof(AnalisiML.ContenutoInAcquaAggiuntaFuoriSoglia),
+                nameof(AnalisiML.CelluleSomatiche),
+                nameof(AnalisiML.CelluleSomaticheFuoriSoglia),
+                nameof(AnalisiML.CaricaBattericaTotale),
+                nameof(AnalisiML.CaricaBattericaTotaleFuoriSoglia),
+                nameof(AnalisiML.MediaCelluleTrimestrePrecendente),
+                nameof(AnalisiML.MediaCelluleTrimestrePrecendenteFuoriSoglia),
+                nameof(AnalisiML.Giorno),
+                nameof(AnalisiML.Mese),
+                nameof(AnalisiML.Anno)).AppendCacheCheckpoint(mlContext));
+            #endregion
+            (string name, IEstimator<ITransformer> value)[] modelliDiRegressione =
+            {
                 ("FastTree", mlContext.Regression.Trainers.FastTree()),
                 ("Poisson", mlContext.Regression.Trainers.LbfgsPoissonRegression()),
-                ("SDCA", mlContext.Regression.Trainers.Sdca()),
+                //("SDCA", mlContext.Regression.Trainers.Sdca()),
                 ("FastTreeTweedie", mlContext.Regression.Trainers.FastTreeTweedie())
             };
-            Console.WriteLine("I modelli sono stati salvati in:\n");
+
+            GestoreInterfaccia.StampaPresentazioneModelli();
             foreach (var modello in modelliDiRegressione)
             {
-                var trainingPipeline = dataProcessPipeline.Append(modello.value);
-                var trainedModel = trainingPipeline.Fit(datiDiTrain);
-
-                IDataView previsioni = trainedModel.Transform(datiDiTest); 
-                var metrics = mlContext.Regression.Evaluate(data: previsioni, labelColumnName: "Label", scoreColumnName: "Score");   
+                var pipelineDiTraining = grassoPipeline.Append(modello.value).Append(mlContext.Transforms.CopyColumns(outputColumnName: "grassopercalcoloprevisto", inputColumnName: "Score")).Append(mlContext.Transforms.CopyColumns(outputColumnName: "proteinepercalcolopreviste", inputColumnName: "Score"));
+                //.Append(mlContext.Transforms.CopyColumns(outputColumnName: "proteinepercalcolopreviste", inputColumnName: "Score")));                
+                var modelloAllenato = pipelineDiTraining.Fit(datiDiTrain);
+                IDataView previsioni = modelloAllenato.Transform(datiDiTest);
+                var metricsGrasso = mlContext.Regression.Evaluate(data: previsioni, labelColumnName: "GrassoPV", scoreColumnName: "grassopercalcoloprevisto"); //.Evaluate(data: previsioni, labelColumnName: "ProteinePV", scoreColumnName: "proteinepercalcolopreviste");
+                var metricsProteine = mlContext.Regression.Evaluate(data: previsioni, labelColumnName: "ProteinePV", scoreColumnName: "proteinepercalcolopreviste");   
                 string percorsoCartellaModello = $@"{percorsoCartella}\Models\{modello.name}.zip";
                 string percorsoCartellaModelloCompleto = PrendiPercorsoCompleto(percorsoCartellaModello);
-                mlContext.Model.Save(trainedModel, datiDiTrain.Schema, percorsoCartellaModelloCompleto);
+                mlContext.Model.Save(modelloAllenato, datiDiTrain.Schema, percorsoCartellaModelloCompleto);
                 GestoreInterfaccia.StampaPercorsiModelli(percorsoCartellaModelloCompleto);
             }
             foreach (var modello in modelliDiRegressione)
             {
                 string percorsoCartellaModello = $@"{percorsoCartella}\Models\{modello.name}.zip";
                 string percorsoCartellaModelloCompleto = PrendiPercorsoCompleto(percorsoCartellaModello);
-                ITransformer trainedModel = mlContext.Model.Load(percorsoCartellaModelloCompleto, out var modelInputSchema);
-                var algoritmoDiPrevisione = mlContext.Model.CreatePredictionEngine<AnalisiML, AnalisiMLPrevisioni>(trainedModel);
+                ITransformer modelloAllenato = mlContext.Model.Load(percorsoCartellaModelloCompleto, out var inputSchemaModello);
+                var algoritmoDiPrevisione = mlContext.Model.CreatePredictionEngine<AnalisiML, AnalisiMLPrevisioni>(modelloAllenato);
                 GestoreInterfaccia.StampaIntestazionePrevisione(modello.name);
                 ModelloML.CalcolaPrevisioni(mlContext, modello.name, algoritmoDiPrevisione, 10, listaDatiDiTest);
             }
-            return null;
+            return null; //dati previsti da inserire nel csv con i reali
         }
+
+        //previsioni multiple
+        #region metodo 1
+        /*MLContext mlContext = new MLContext();
+        DataViewSchema predictionPipelineSchema;
+        ITransformer predictionPipeline = mlContext.Model.Load("model.zip", out predictionPipelineSchema);
+        //AnalisiML[] analisiML = new AnalisiML[]
+        //{
+        //    new AnalisiML
+        //    {
+        //        //dati reali
+        //    },
+        //    new AnalisiML
+        //    {
+        //        //dati reali
+        //    }
+        //};
+        //IDataView predictions = predictionPipeline.Transform(inputData);*/
+        #endregion
+        #region metodo 2
+        //private static ITransformer Train(MLContext mlContext, string trainDataPath)
+        //{
+        //    IDataView dataView = _textLoader.Read(trainDataPath);
+        //    var pipelinePerGrassoPv = mlContext.Transforms.CopyColumns("Label", "grassopercalcoloprevisto")
+        //    .Append(mlContext.Transforms.Categorical.OneHotEncoding("VendorId"))
+        //    .Append(mlContext.Transforms.Categorical.OneHotEncoding("RateCode"))
+        //    .Append(mlContext.Transforms.Categorical.OneHotEncoding("PaymentType"))
+        //    .Append(mlContext.Transforms.Concatenate("Features", "VendorId", "RateCode", "PassengerCount", "TripDistance", "PaymentType"))
+        //    .Append(mlContext.Regression.Trainers.FastTree())
+        //    .Append(mlContext.Transforms.CopyColumns(outputcolumn: "tripTime", inputcolumn: "Score"));
+
+        //    var pipelinePerProteinePv = mlContext.Transforms.CopyColumns("Label", "proteinepercalcolopreviste")
+        //    .Append(mlContext.Transforms.Categorical.OneHotEncoding("VendorId"))
+        //    .Append(mlContext.Transforms.Categorical.OneHotEncoding("RateCode"))
+        //    .Append(mlContext.Transforms.Categorical.OneHotEncoding("PaymentType"))
+        //    .Append(mlContext.Transforms.Concatenate("Features", "VendorId", "RateCode", "PassengerCount", "TripDistance", "PaymentType"))
+        //    .Append(mlContext.Regression.Trainers.FastTree())
+        //    .Append(mlContext.Transforms.CopyColumns(outputcolumn: "fareAmount", inputcolumn: "Score"));
+
+
+
+        //    var model = pipelineForTripTime.Append(pipelineForFareAmount).Fit(dataView);
+        //    SaveModelAsFile(mlContext, model);
+        //    return model;
+        //}
+        #endregion
 
         private static void CreaCsv(List<AnalisiML> analisiML, List<AnalisiMLPrevisioni> datiPrevisti)
         {

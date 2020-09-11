@@ -50,6 +50,13 @@ namespace LatteMarcheML
             Console.ReadKey();
         }
 
+        public static void StampaPresentazioneModelli()
+        {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("I modelli sono stati salvati in:\n");
+            Console.ForegroundColor = ConsoleColor.White;
+        }
+
         public static void StampaPercorsiModelli(string percorsoCartellaModelloCompleto)
         {
             Console.WriteLine(percorsoCartellaModelloCompleto);
@@ -57,25 +64,38 @@ namespace LatteMarcheML
 
         public static void StampaIntestazionePrevisione(string nomeModello)
         {
-            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.ForegroundColor = ConsoleColor.Blue;
             Console.WriteLine($"\n\n=========== Visualizza 10 previsioni per ogni modello: {nomeModello}.zip ===========\n");
             Console.ForegroundColor = ConsoleColor.White;
+        }
+
+        public static void StampaConfrontoDatoRealeControPrevisto(string datoPrevisto, string datoReale)
+        {
+            Console.ForegroundColor = ConsoleColor.Gray;
+            Console.WriteLine($"------------------------------");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine($"Dato reale:     {datoReale}");
+            Console.WriteLine($"Dato previsto:  {datoPrevisto}");
         }
 
         public static void StampaPrevisioneDati(List<string> datiPrevisti)
         {
             Console.WriteLine("\n");
+            bool primaRiga = true;
             foreach (var singoloValore in datiPrevisti)
             {
+                if (primaRiga)
+                {
+                    primaRiga = false;
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"{singoloValore}\n");
+                    Console.ForegroundColor = ConsoleColor.White;
+                    goto ciclo;
+                }
                 Console.WriteLine(singoloValore);
+                ciclo:;
             }
-        }
-
-        public static void StampaConfrontoDatoRealeControPrevisto(string datoPrevisto, string datoReale)
-        {
-            Console.WriteLine($"------------------------------");
-            Console.WriteLine($"Dato reale:     {datoReale}");
-            Console.WriteLine($"Dato previsto:  {datoPrevisto}");
+            Console.WriteLine("\n\n");
         }
 
         public static void TerminaEsecuzione()
