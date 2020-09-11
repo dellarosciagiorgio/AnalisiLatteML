@@ -9,8 +9,8 @@ namespace LatteMarcheML
         public string Id { get; set; }
         public string Nome { get; set; }
         public string Uom { get; set; }
-        public double? Valore { get; set; }
-        public bool? FuoriSoglia { get; set; }
+        public float Valore { get; set; }
+        public float FuoriSoglia { get; set; }
         public string AnalisiId { get; set; }
     }
 }

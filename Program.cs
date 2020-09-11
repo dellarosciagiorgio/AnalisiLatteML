@@ -1,24 +1,12 @@
 ﻿using ClosedXML.Excel;
 using Microsoft.ML;
-using Microsoft.ML.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 
 namespace LatteMarcheML
 {
-    public class DataPoint
-    {
-        public double[] Features { get; set; }
-    }
-
-    public class DataPointVector
-    {
-        [VectorType(5)]
-        public string[] Features { get; set; }
-    }
 
     public class Program
     {
@@ -30,35 +18,19 @@ namespace LatteMarcheML
             var foglioExcelAnalisi = fileExcel.Worksheet("Analisi");
             var listaAnalisiLatte = PrendiDatiFoglioAnalisi(foglioExcelAnalisi);
             var datiProduttori = PrendiDati(listaAnalisiLatte);
-            //StampaDatiSingoloProduttore(datiProduttori);
-            var datiInteressati = PrendiDatiInteressati(datiProduttori);
-            var contenutoCsv = TrasformaDati(datiInteressati);
-            var analisiML = TrasformaProduttoreToAnalisiML(datiProduttori);
-            //CreaFileCsv(contenutoCsv);
-            //PrevisioniML(contenutoCsv);
-            Console.WriteLine("FINE");
-            Console.ReadLine();
+            //GestoreInterfaccia.StampaDatiSingoloProduttore(datiProduttori);
+            var analisiML = TrasformaProduttoreInAnalisiML(datiProduttori);
+            var datiPrevisti = PrevisioniML(analisiML);
+            //CreaFileCsv(analisiML, datiPrevisti);
+            GestoreInterfaccia.TerminaEsecuzione();
         }
 
-        private static List<AnalisiML> TrasformaProduttoreToAnalisiML(List<Produttore> datiProduttori)
+        public static string PrendiPercorsoCompleto(string percorsoParziale)
         {
-            List<AnalisiML> listaAnalisiML = new List<AnalisiML>();
-            foreach (var produttore in datiProduttori)
-            {
-                foreach (var analisi in produttore.Analisi)
-                {
-                    var analisiML = new AnalisiML();
-                    analisiML.NomeProduttore = produttore.Nome;
-                    //analisiML.GrassoPerCalcolo = float.Parse(analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore.Value)
-                        );
-
-                    //foreach (var valori in analisi.Valori)
-                    //{
-
-                    //}
-                }
-            }
-            throw new NotImplementedException();
+            FileInfo _dataRoot = new FileInfo(typeof(Program).Assembly.Location);
+            string percorsoCartellaAssembly = _dataRoot.Directory.FullName;
+            string percorsoCompleto = Path.Combine(percorsoCartellaAssembly, percorsoParziale);
+            return percorsoCompleto;
         }
 
         private static List<AnalisiLatteExcel> PrendiDatiFoglioAnalisi(IXLWorksheet foglioExcelAnalisi)
@@ -84,24 +56,42 @@ namespace LatteMarcheML
         private static List<ValorePrelievo> PrendiDatiFoglioValori(IXLWorksheet foglioExcelValori)
         {
             var tabellaValori = foglioExcelValori.Tables.First();
-            var listaValoriPrelievi = tabellaValori.DataRange.Rows().Select(riga => new ValorePrelievo()
+            var listaValoriPrelievi = new List<ValorePrelievo>();
+            listaValoriPrelievi = tabellaValori.DataRange.Rows().Select(riga => new ValorePrelievo()
             {
                 Id = riga.Field("ID").GetString().Trim(),
                 Nome = riga.Field("NOME").GetString().Trim(),
                 Uom = riga.Field("UOM").GetString().Trim(),
-                Valore = riga.Field("VALORE").IsEmpty() ? (Double?)null :
-                         (riga.Field("VALORE").DataType == XLDataType.Text) ? ((String.Compare(riga.Field("VALORE").GetString().Trim(), "assenti") == 0) ? (Double?)null :
-                         Double.Parse(riga.Field("VALORE").GetString().Trim())) :
-                         ((riga.Field("VALORE").DataType == XLDataType.Number) ? riga.Field("VALORE").GetDouble() :
-                         (Double?)null),
-                FuoriSoglia = riga.Field("VALORE").IsEmpty() ? (Boolean?)null :
-                         (riga.Field("VALORE").DataType == XLDataType.Text) ? ((String.Compare(riga.Field("VALORE").GetString().Trim(), "assenti") == 0) ? (Boolean?)null :
-                         Convert.ToBoolean(riga.Field("FUORI_SOGLIA").GetValue<Int32>())) :
-                         ((riga.Field("VALORE").DataType == XLDataType.Number) ? Convert.ToBoolean(riga.Field("FUORI_SOGLIA").GetValue<Int32>()) :
-                         (Boolean?)null),
-                AnalisiId = riga.Field("Analisi_Id").GetString().Trim(),
+                Valore = PrendiDatoSingolaCella(riga.Field("VALORE")),
+                FuoriSoglia = PrendiDatoSingolaCella(riga.Field("FUORI_SOGLIA")),
+                AnalisiId = riga.Field("Analisi_Id").GetString().Trim()
             }).ToList();
             return listaValoriPrelievi;
+        }
+
+        private static float PrendiDatoSingolaCella(IXLCell contenutoCella)
+        {
+            if(!contenutoCella.IsEmpty())
+            {
+                if (contenutoCella.DataType == XLDataType.Text)
+                {
+                    if (String.Compare(contenutoCella.GetString().Trim(), "assenti") == 0)
+                    {
+                        return 0f;
+                    }
+                    else
+                    {
+                        var datoCella = float.Parse(contenutoCella.GetString().Trim());
+                        return datoCella;
+                    }
+                }
+                else if (contenutoCella.DataType == XLDataType.Number)
+                {
+                    var datoCella = float.Parse(contenutoCella.GetString().Trim());
+                    return datoCella;
+                }
+            }
+            return 0f;
         }
 
         private static List<Produttore> PrendiDati(List<AnalisiLatteExcel> listaAnalisiLatte)
@@ -148,132 +138,81 @@ namespace LatteMarcheML
             return datiProduttori;
         }
 
-        private static void StampaDatiSingoloProduttore(List<Produttore> datiProduttori)
+        private static List<AnalisiML> TrasformaProduttoreInAnalisiML(List<Produttore> datiProduttori)
         {
-            Console.Clear();
-            input:;
-            Console.Write("Inserire l'ID del produttore per visualizzarne i dati dei prelievi: ");
-            var idProduttore = Console.ReadLine();
-            Console.Clear();
-            Produttore appoggioDatiProduttore = null;
-            foreach (var datiProduttore in datiProduttori)
+            List<AnalisiML> listaDatiAnalisiML = new List<AnalisiML>();
+            foreach (var produttore in datiProduttori)
             {
-                if (idProduttore == datiProduttore.Id)
+                foreach (var analisi in produttore.Analisi)
                 {
-                    Console.WriteLine($"{datiProduttore.Nome}, ID: {datiProduttore.Id}, codice: {datiProduttore.Codice}, ID allevamento: {datiProduttore.IdAllevamento}, tipo latte: {datiProduttore.TipoLatte}, ID tipo latte: {datiProduttore.IdTipoLatte}.\n");
-                    int indiceAnalisi, indiceValori;
-                    datiProduttore.Analisi.ForEach(analisi =>
+                    listaDatiAnalisiML.Add(new AnalisiML()
                     {
-                        indiceAnalisi = datiProduttore.Analisi.IndexOf(analisi);
-                        Console.WriteLine($"\n\nCampione: {analisi.Campione}, data rapporto di prova: {analisi.DataRapportoDiProva.Value:dd/MM/yyyy}, data accettazione: {analisi.DataAccettazione.Value:dd/MM/yyyy}, data prelievo: {analisi.DataPrelievo.Substring(0, 10)}\n");
-                        datiProduttore.Analisi[indiceAnalisi].Valori.ForEach(valori =>
-                        {
-                            string fuorisoglia = "no";
-                            indiceValori = datiProduttore.Analisi[indiceAnalisi].Valori.IndexOf(valori);
-                            if (datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].FuoriSoglia == true)
-                            {
-                                fuorisoglia = "sì";
-                            }
-                            Console.WriteLine($"Analisi ID: {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Id}, ID: {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Id}, {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Nome}: {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Valore} {datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Uom}, fuori soglia: {fuorisoglia}.");
-                        });
-                    });
-                    appoggioDatiProduttore = datiProduttore;
-                }
-            }
-            if (appoggioDatiProduttore == null)
-            {
-                Console.Clear();
-                Console.Write("ID non valido, riprova.\n\n");
-                goto input;
-            }
-            Console.ReadLine();
-        }
-
-        private static List<string> PrendiDatiInteressati(List<Produttore> datiProduttori)
-        {
-            List<string> datiInteressati = new List<string>();
-            string intestazione = "Campione,NomeProduttore,IdProduttore,NomeValore,Valore,FuoriSoglia,DataPrelievo"; //TODO: nel csv inserire la data completa (unendo contenutoCsv), quella divisa in dd mm yyyy la andrò a prendere dalla lista "contenutoCsv"
-            datiInteressati.Add(intestazione);
-            foreach (var datiProduttore in datiProduttori)
-            {
-                int indiceAnalisi, indiceValori;
-                datiProduttore.Analisi.ForEach(analisi =>
-                {
-                    indiceAnalisi = datiProduttore.Analisi.IndexOf(analisi);
-                    datiProduttore.Analisi[indiceAnalisi].Valori.ForEach(valori =>
-                    {
-                        indiceValori = datiProduttore.Analisi[indiceAnalisi].Valori.IndexOf(valori);
-                        datiInteressati.Add($"{datiProduttore.Analisi[indiceAnalisi].Campione}," +
-                            $"{datiProduttore.Nome}," +
-                            $"{datiProduttore.Id}," +
-                            $"{datiProduttore.Analisi[indiceAnalisi].DataPrelievo.ToString()}, " +
-                            $"{datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Nome}," +
-                            $"{datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].Valore.ToString().Replace(',', '.')}," +
-                            $"{datiProduttore.Analisi[indiceAnalisi].Valori[indiceValori].FuoriSoglia.ToString()}");
-                    });
-                });
-            }
-            return datiInteressati;
-        }
-
-        private static List<AnalisiML> TrasformaDati(List<string> datiInteressati)
-        {
-            var contenutoCsv = new List<AnalisiML>();
-            bool rigaIntestazione = true;
-            foreach (var rigaDatiInteressati in datiInteressati)
-            {
-                if (rigaIntestazione == true)
-                {
-                    rigaIntestazione = false;
-                }
-                else
-                {
-                    var data = rigaDatiInteressati.Split(',');
-                    contenutoCsv.Add(new AnalisiML()
-                    {
-                        Campione = data[0],
-                        NomeProduttore = data[1],
-                        IdProduttore = data[2],
-                        NomeValore = data[4],
-                        Valore = data[5] == "" ? 0f : float.Parse(data[5]),
-                        FuoriSoglia = data[6] == "true" ? 1f : 0f,
-                        Giorno = data[3] == "" ? 0f : float.Parse(data[3].Trim().Substring(0, 2)),
-                        Mese = data[3] == "" ? 0f : float.Parse(data[3].Trim().Substring(3, 2)),
-                        Anno = data[3] == "" ? 0f : float.Parse(data[3].Trim().Substring(6, 4))
+                        Campione = analisi.Campione,
+                        NomeProduttore = produttore.Nome,
+                        GrassoPv = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore.ToString() == "" ? 0f : analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore,
+                        GrassoPerCalcolo = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore.ToString() == "" ? 0f : analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").Valore,
+                        GrassoPerCalcoloFuoriSoglia = analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").FuoriSoglia.ToString() == "" ? 0f : analisi.Valori.FirstOrDefault(a => a.Nome.Trim() == "Grasso (per calcolo)").FuoriSoglia,
+                        Giorno = analisi.DataPrelievo == "" ? 0f : float.Parse(analisi.DataPrelievo.Substring(0, 2)),
+                        Mese = analisi.DataPrelievo == "" ? 0f : float.Parse(analisi.DataPrelievo.Substring(3, 2)),
+                        Anno = analisi.DataPrelievo == "" ? 0f : float.Parse(analisi.DataPrelievo.Substring(6, 4))
                     });
                 }
             }
-            return contenutoCsv;
+            return listaDatiAnalisiML;
         }
 
-        private static void CreaFileCsv(List<AnalisiML> contenutoCsv)
+        private static List<AnalisiMLPrevisioni> PrevisioniML(List<AnalisiML> analisiML)
         {
-            /*const string percorsoFileCsv = @"C:\Users\Giorgio Della Roscia\source\repos\LatteMarcheML\Data\Dati Produttori.csv";
-            string intestazione = "Campione,NomeProduttore,IdProduttore,NomeValore,Valore,FuoriSoglia,DataPrelievo";
-            k:;
-            if (!File.Exists(percorsoFileCsv))
+            const string percorsoCartella = @"C:\Users\Giorgio Della Roscia\source\repos\LatteMarcheML\Data";
+            //string percorsoFileDiTraining = $@"{percorsoCartella}\DatiProduttori - train.csv";
+            //string percorsoFileDiTest = $@"{percorsoCartella}\DatiProduttori - test.csv";
+            //string percorsoFileDiTrainingCompleto = PrendiPercorsoCompleto(percorsoFileDiTraining);
+            //string percorsoFileDiTestCompleto = PrendiPercorsoCompleto(percorsoFileDiTest);
+            var mlContext = new MLContext(seed: 0);
+            var datiDiTrain = mlContext.Data.LoadFromEnumerable<AnalisiML>(analisiML);
+            //var datiDiTest = mlContext.Data.LoadFromTextFile<AnalisiML>(percorsoFileDiTestCompleto, separatorChar: ',', hasHeader: true);
+            //var datiDiTest = mlContext.Data.LoadFromEnumerable<AnalisiML>(ModelloML.LeggiDatiDiTestDaCsv(10));
+            List<AnalisiML> listaDatiDiTest = new List<AnalisiML>();
+            for (int i = 0; i < 10; i++)
             {
-                var processoFileCsv = File.Create(percorsoFileCsv);
-                processoFileCsv.Close();
-                File.WriteAllText(percorsoFileCsv, intestazione);
-                foreach (var riga in contenutoCsv)
-                {
-                    File.WriteAllText(percorsoFileCsv, riga);
-                }
+                //var singolaAnalisi = analisiML[i * 2]; 
+                //AnalisiML app = singolaAnalisi.Campione, //TODO: come si inseriscono i dati direttamentein un oggetto?
+                listaDatiDiTest.Add(analisiML[i*2]);
             }
-            else
+            var datiDiTest = mlContext.Data.LoadFromEnumerable<AnalisiML>(listaDatiDiTest);            
+            var dataProcessPipeline = mlContext.Transforms.Concatenate("Features", nameof(AnalisiML.GrassoPerCalcolo), nameof(AnalisiML.GrassoPerCalcoloFuoriSoglia), /*nameof(AnalisiML.ProteinePerCalcolo), nameof(AnalisiML.ProteinePerCalcoloFuoriSoglia),*/ nameof(AnalisiML.Giorno), nameof(AnalisiML.Mese), nameof(AnalisiML.Anno)).AppendCacheCheckpoint(mlContext);
+            (string name, IEstimator<ITransformer> value)[] modelliDiRegressione = {
+                ("FastTree", mlContext.Regression.Trainers.FastTree()),
+                ("Poisson", mlContext.Regression.Trainers.LbfgsPoissonRegression()),
+                ("SDCA", mlContext.Regression.Trainers.Sdca()),
+                ("FastTreeTweedie", mlContext.Regression.Trainers.FastTreeTweedie())
+            };
+            Console.WriteLine("I modelli sono stati salvati in:\n");
+            foreach (var modello in modelliDiRegressione)
             {
-                File.Delete(percorsoFileCsv);
-                goto k;
+                var trainingPipeline = dataProcessPipeline.Append(modello.value);
+                var trainedModel = trainingPipeline.Fit(datiDiTrain);
+
+                IDataView previsioni = trainedModel.Transform(datiDiTest); 
+                var metrics = mlContext.Regression.Evaluate(data: previsioni, labelColumnName: "Label", scoreColumnName: "Score");   
+                string percorsoCartellaModello = $@"{percorsoCartella}\Models\{modello.name}.zip";
+                string percorsoCartellaModelloCompleto = PrendiPercorsoCompleto(percorsoCartellaModello);
+                mlContext.Model.Save(trainedModel, datiDiTrain.Schema, percorsoCartellaModelloCompleto);
+                GestoreInterfaccia.StampaPercorsiModelli(percorsoCartellaModelloCompleto);
             }
-            Console.Clear();
-            Console.WriteLine("\n******************** DATI PRODUTTORI ********************\n\n");
-            var datiLettiDalCsv = File.ReadAllText(percorsoFileCsv);
-            Console.WriteLine(datiLettiDalCsv);
-            Console.ReadLine();*/
+            foreach (var modello in modelliDiRegressione)
+            {
+                string percorsoCartellaModello = $@"{percorsoCartella}\Models\{modello.name}.zip";
+                string percorsoCartellaModelloCompleto = PrendiPercorsoCompleto(percorsoCartellaModello);
+                ITransformer trainedModel = mlContext.Model.Load(percorsoCartellaModelloCompleto, out var modelInputSchema);
+                var algoritmoDiPrevisione = mlContext.Model.CreatePredictionEngine<AnalisiML, AnalisiMLPrevisioni>(trainedModel);
+                GestoreInterfaccia.StampaIntestazionePrevisione(modello.name);
+                ModelloML.CalcolaPrevisioni(mlContext, modello.name, algoritmoDiPrevisione, 10, listaDatiDiTest);
+            }
+            return null;
         }
 
-        private static void PrevisioniML(List<AnalisiML> contenutoCsv)
+        private static void CreaCsv(List<AnalisiML> analisiML, List<AnalisiMLPrevisioni> datiPrevisti)
         {
             
         }
